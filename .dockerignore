@@ -1,0 +1,29 @@
+# Controle de versão / metadados
+.git
+.gitignore
+.github
+
+# Documentação e artefatos que não entram na imagem
+*.md
+LICENSE
+
+# Segredos e configs locais (NUNCA na imagem)
+.env
+*.env
+!.env.example
+
+# Binários compilados localmente
+bin/
+/out/
+*.exe
+
+# Lixo de SO / editor
+.DS_Store
+*.log
+.vscode
+.idea
+
+# Os próprios arquivos Docker (não precisam ir para dentro do contexto de build)
+Dockerfile
+.dockerignore
+docker-compose.yml

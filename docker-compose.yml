@@ -1,0 +1,74 @@
+services:
+  # ---------------------------------------------------------------------
+  # Banco de dados PostgreSQL 16
+  # ---------------------------------------------------------------------
+  postgres:
+    # Debian (glibc) em vez de -alpine (musl): muito mais estável sob
+    # emulação QEMU. Se sua máquina e o Docker forem da mesma arquitetura,
+    # postgres:16-alpine também funciona.
+    image: postgres:16
+    container_name: banco_sox_pg
+    environment:
+      POSTGRES_USER: banco
+      POSTGRES_PASSWORD: banco
+      POSTGRES_DB: banco_sox
+    ports:
+      - "5432:5432"
+    volumes:
+      - banco_sox_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U banco -d banco_sox"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+
+  # ---------------------------------------------------------------------
+  # Migração (one-shot): aplica 0001 + 0002 e encerra.
+  # Constrói a imagem banco-sox:latest a partir do Dockerfile.
+  # ---------------------------------------------------------------------
+  migrate:
+    build: .
+    image: banco-sox:latest
+    container_name: banco_sox_migrate
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGHOST: postgres
+      PGPORT: "5432"
+      PGUSER: banco
+      PGPASSWORD: banco
+      PGDATABASE: banco_sox
+      PGSSLMODE: disable
+      TZ: America/Sao_Paulo
+    command: ["/app/migrate", "up"]
+    restart: "no"
+
+  # ---------------------------------------------------------------------
+  # Simulador (one-shot): popula baseline e roda os cenários de regras.
+  # Só inicia depois que a migração terminar com sucesso.
+  # ---------------------------------------------------------------------
+  simulador:
+    build: .
+    image: banco-sox:latest
+    container_name: banco_sox_simulador
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      PGHOST: postgres
+      PGPORT: "5432"
+      PGUSER: banco
+      PGPASSWORD: banco
+      PGDATABASE: banco_sox
+      PGSSLMODE: disable
+      TZ: America/Sao_Paulo
+      # Limiares SOX podem ser sobrescritos aqui, ex.:
+      # SOX_TETO_CENTAVOS: "5000000"
+      # SOX_ZSCORE: "3.0"
+    # -bootstrap popula a base; -run (default true) roda a simulação logo após.
+    command: ["/app/simulador", "-bootstrap"]
+    restart: "no"
+
+volumes:
+  banco_sox_data:
